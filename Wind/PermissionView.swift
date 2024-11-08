@@ -1,53 +1,42 @@
 import SwiftUI
+import UserNotifications
 import FamilyControls
 import DeviceActivity
 
 struct PermissionView: View {
     @State private var authorizationCenter = AuthorizationCenter.shared
     @State private var isAuthorized = false
-    @AppStorage("permissionsGranted") private var permissionsGranted: Bool = false // 권한 상태 저장
+    @AppStorage("permissionsGranted") private var permissionsGranted: Bool = false
+    @Environment(\.colorScheme) var colorScheme // 현재 컬러 스킴(라이트/다크 모드) 가져오기
 
     var body: some View {
         VStack {
-            Text("앱을 사용하려면 권한이 필요해요!")
-                .font(.title)
+            Text("앱 사용을 위한 권한을 설정해주세요.")
+                .font(.title2)
+                .multilineTextAlignment(.center)
                 .padding()
 
-            Button("알림 권한 요청") {
-                requestNotificationPermission()
-            }
-            .padding()
-            .background(Color.blue)
-            .foregroundColor(.white)
-            .cornerRadius(8)
+            Spacer()
 
-            if !isAuthorized {
-                Button("스크린 타임 권한 요청") {
-                    requestScreenTimePermission()
-                }
-                .padding()
-                .background(Color.green)
-                .foregroundColor(.white)
-                .cornerRadius(8)
-            } else {
-                // 모든 권한이 부여된 경우 완료 버튼 표시
-                Button("모든 권한 부여 완료") {
-                    permissionsGranted = true // 권한 부여 상태 저장
-                }
-                .padding()
-                .background(Color.green)
-                .foregroundColor(.white)
-                .cornerRadius(8)
+            Button(action: {
+                requestScreenTimePermission()
+            }) {
+                Text("Screen Time 권한 요청")
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(colorScheme == .dark ? Color.white : Color.blue) // 다크 모드일 때는 흰색, 라이트 모드일 때는 파란색
+                    .foregroundColor(colorScheme == .dark ? .black : .white) // 다크 모드일 때 검은색 글자, 라이트 모드일 때 흰색 글자
+                    .cornerRadius(8)
+                    .padding()
             }
+            .padding(.bottom, 20) // 하단에 버튼 배치
         }
-        .padding()
         .onAppear {
-            // 권한 상태 확인
-            isAuthorized = authorizationCenter.authorizationStatus == .approved
+            requestNotificationPermission() // 화면에 나타나자마자 알림 권한 요청
         }
     }
 
-    func requestNotificationPermission() {
+    private func requestNotificationPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
             if let error = error {
                 print("알림 권한 요청 실패: \(error.localizedDescription)")
@@ -61,18 +50,19 @@ struct PermissionView: View {
             }
         }
     }
-    
-    func requestScreenTimePermission() {
+
+    private func requestScreenTimePermission() {
         Task {
             do {
                 try await authorizationCenter.requestAuthorization(for: .individual)
                 DispatchQueue.main.async {
                     isAuthorized = authorizationCenter.authorizationStatus == .approved
+                    if isAuthorized {
+                        permissionsGranted = true
+                    }
                 }
             } catch {
-                DispatchQueue.main.async {
-                    // 권한 요청 실패 시 추가 처리 가능
-                }
+                print("스크린 타임 권한 요청 실패")
             }
         }
     }
